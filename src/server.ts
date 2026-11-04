@@ -264,10 +264,14 @@ app.use(
     });
   }
 );
+// تصدير التطبيق ليستعمله Vercel
+export default app;
 
-// تشغيل السيرفر
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`SAWARLY Server running on port ${PORT}`);
-  console.log("AI Provider: Z.ai");
-  console.log(`AI Model: ${model}`);
-});
+// تشغيل السيرفر محليًا فقط
+if (process.env.NODE_ENV !== "production") {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`SAWARLY Server running on port ${PORT}`);
+    console.log("AI Provider: Z.ai");
+    console.log(`AI Model: ${model}`);
+  });
+}
