@@ -10,19 +10,19 @@ import OpenAI from "openai";
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 
+app.disable("x-powered-by");
 app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
-app.use(
-  "/api/",
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 10,
-    standardHeaders: "draft-7",
-    legacyHeaders: false
-  })
-);
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false
+});
+
+app.use("/api/", apiLimiter);
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -45,19 +45,20 @@ const upload = multer({
   }
 });
 
-// إعداد Z.ai
-const apiKey = process.env.ZAI_API_KEY;
 const model = process.env.ZAI_MODEL || "glm-4.6v-flash";
 
-if (!apiKey) {
-  console.error("لم يتم العثور على ZAI_API_KEY في ملف .env");
-  process.exit(1);
-}
+function getAIClient(): OpenAI {
+  const apiKey = process.env.ZAI_API_KEY;
 
-const ai = new OpenAI({
-  apiKey,
-  baseURL: "https://api.z.ai/api/paas/v4"
-});
+  if (!apiKey) {
+    throw new Error("ZAI_API_KEY_MISSING");
+  }
+
+  return new OpenAI({
+    apiKey,
+    baseURL: "https://api.z.ai/api/paas/v4"
+  });
+}
 
 function getErrorStatus(error: unknown): number | undefined {
   if (
@@ -76,7 +77,7 @@ async function analyzeImage(
   mimeType: string,
   prompt: string
 ): Promise<string> {
-  console.log(`جاري تحليل الصورة باستخدام Z.ai: ${model}`);
+  const ai = getAIClient();
 
   const response = await ai.chat.completions.create({
     model,
@@ -117,21 +118,28 @@ async function analyzeImage(
     throw new Error("الموديل لم يرجع نتيجة");
   }
 
-  console.log("نجح تحليل الصورة باستخدام Z.ai");
-
   return result
     .replace(/\*\*/g, "")
     .replace(/\*/g, "")
     .trim();
 }
 
-// الصفحة الرئيسية
+// اختبار حالة السيرفر
 app.get("/", (_req, res) => {
-  res.json({
+  res.status(200).json({
     status: "ok",
     app: "SAWARLY Server",
     provider: "Z.ai",
-    model
+    model,
+    environment: process.env.NODE_ENV || "development"
+  });
+});
+
+// فحص جاهزية مفتاح الذكاء الاصطناعي بدون كشفه
+app.get("/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    aiConfigured: Boolean(process.env.ZAI_API_KEY)
   });
 });
 
@@ -155,9 +163,7 @@ app.post(
           ? req.body.question.trim()
           : "";
 
-      const hasQuestion = question.length > 0;
-
-      const prompt = hasQuestion
+      const prompt = question
         ? `
 أنت المساعد البصري الذكي في تطبيق صورلي SAWARLY.
 
@@ -165,12 +171,11 @@ app.post(
 
 قواعد الإجابة:
 - استخدم اللغة العربية الواضحة.
-- ركز على السؤال ولا تخرج عن الموضوع.
+- ركز على السؤال.
 - اقرأ النصوص الظاهرة إذا كانت مرتبطة بالسؤال.
 - لا تخترع معلومات غير ظاهرة.
 - وضح عدم التأكد عندما تكون الصورة غير واضحة.
 - لا تستخدم Markdown أو علامات النجمة.
-- اجعل الإجابة مختصرة ومفيدة.
 
 سؤال المستخدم:
 ${question}
@@ -178,32 +183,19 @@ ${question}
         : `
 أنت المساعد البصري الذكي في تطبيق صورلي SAWARLY.
 
-المستخدم لم يكتب سؤالاً، لذلك افهم الصورة تلقائياً وقدم له المساعدة المناسبة.
+حلل الصورة تلقائياً وقدم المساعدة المناسبة.
 
 المطلوب:
 1. حدد ما يظهر في الصورة.
 2. اشرح أهم المعلومات والعناصر الظاهرة.
-3. اقرأ النصوص الواضحة إذا كانت موجودة.
-4. إذا كانت الصورة تعليمية، اشرح فكرتها ببساطة.
-5. إذا كانت لمنتج أو جهاز، وضح ماهيته واستخدامه إذا أمكن تحديده.
-6. اذكر أي معلومة مهمة قد تفيد المستخدم.
+3. اقرأ النصوص الواضحة إن وجدت.
+4. إذا كانت تعليمية، اشرح فكرتها ببساطة.
+5. إذا كانت لمنتج أو جهاز، وضح ماهيته واستخدامه إذا أمكن.
+6. لا تخترع معلومات غير ظاهرة.
 
-قواعد الإجابة:
-- اكتب بالعربية الواضحة.
-- ابدأ بوصف مباشر للصورة.
-- اجعل الإجابة مختصرة، في حدود 5 إلى 8 جمل.
-- لا تخترع معلومات غير ظاهرة.
-- لا تستخدم Markdown أو علامات النجمة.
-- إذا لم تستطع تحديد شيء، وضح ذلك.
-- لا تطلب من المستخدم كتابة سؤال.
+اكتب بالعربية الواضحة في 5 إلى 8 جمل.
+لا تستخدم Markdown أو علامات النجمة.
 `;
-
-      console.log("بدأ تحليل صورة جديدة...");
-      console.log(
-        hasQuestion
-          ? "نوع التحليل: بناءً على سؤال المستخدم"
-          : "نوع التحليل: تلقائي بدون سؤال"
-      );
 
       const analysis = await analyzeImage(
         req.file.buffer.toString("base64"),
@@ -212,25 +204,32 @@ ${question}
       );
 
       console.log(
-        `اكتمل تحليل الصورة بنجاح. المدة: ${Date.now() - startedAt}ms`
+        `Analysis completed in ${Date.now() - startedAt}ms`
       );
 
-      res.json({
+      res.status(200).json({
         success: true,
         analysis
       });
 
     } catch (error) {
-      const status = getErrorStatus(error);
+      console.error("Analysis error:", error);
 
-      console.error("Z.ai Analysis error:", error);
-      console.error(
-        `فشل التحليل بعد ${Date.now() - startedAt}ms`
-      );
+      if (
+        error instanceof Error &&
+        error.message === "ZAI_API_KEY_MISSING"
+      ) {
+        res.status(503).json({
+          error: "خدمة الذكاء الاصطناعي غير مُعدّة حالياً."
+        });
+        return;
+      }
+
+      const status = getErrorStatus(error);
 
       if (status === 429 || status === 503) {
         res.status(503).json({
-          error: "خدمة تحليل الصور مشغولة حالياً. حاول مرة أخرى بعد قليل."
+          error: "خدمة تحليل الصور مشغولة حالياً. حاول لاحقاً."
         });
         return;
       }
@@ -249,27 +248,34 @@ ${question}
   }
 );
 
-// معالجة أخطاء رفع الملفات والطلبات
-app.use(
-  (
-    error: Error,
-    _req: express.Request,
-    res: express.Response,
-    _next: express.NextFunction
-  ) => {
-    console.error("Request error:", error);
+// معالجة المسارات غير الموجودة
+app.use((_req, res) => {
+  res.status(404).json({
+    error: "المسار المطلوب غير موجود",
+    app: "SAWARLY Server"
+  });
+});
 
-    res.status(400).json({
-      error: error.message || "طلب غير صالح"
-    });
-  }
-);
+// معالجة أخطاء رفع الملفات والطلبات
+app.use((
+  error: Error,
+  _req: express.Request,
+  res: express.Response,
+  _next: express.NextFunction
+) => {
+  console.error("Request error:", error);
+
+  res.status(400).json({
+    error: error.message || "طلب غير صالح"
+  });
+});
+
 export default app;
 
+// تشغيل محلي فقط، وVercel يتولى تشغيل التطبيق في الإنتاج
 if (process.env.NODE_ENV !== "production") {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`SAWARLY Server running on port ${PORT}`);
-    console.log("AI Provider: Z.ai");
     console.log(`AI Model: ${model}`);
   });
 }
