@@ -263,11 +263,8 @@ app.use(
       error: error.message || "طلب غير صالح"
     });
   }
-);
-// تصدير التطبيق ليستعمله Vercel
-export default app;
+);export default app;
 
-// تشغيل السيرفر محليًا فقط
 if (process.env.NODE_ENV !== "production") {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`SAWARLY Server running on port ${PORT}`);
