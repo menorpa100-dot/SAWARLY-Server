@@ -101,7 +101,15 @@ async function analyzeImage(
     max_tokens: 1000
   });
 
-  const content = response.choices[0]?.message?.content;
+
+const content = response.choices[0]?.message?.content;
+
+const result = typeof content === "string" ? content : "";
+
+if (!result.trim()) {
+  throw new Error("الموديل لم يرجع نتيجة");
+}
+
 
   let result = "";
 
