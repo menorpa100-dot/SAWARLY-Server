@@ -8,6 +8,9 @@ import rateLimit from "express-rate-limit";
 import OpenAI from "openai";
 
 const app = express();
+
+// التطبيق يعمل خلف Vercel Proxy
+app.set("trust proxy", 1);
 const PORT = Number(process.env.PORT || 3000);
 const model = process.env.ZAI_MODEL || "glm-4.6v-flash";
 
