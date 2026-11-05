@@ -1,15 +1,18 @@
-
 import type {
   Request,
   Response,
   NextFunction
 } from "express";
 
-import { supabaseAdmin } from "./supabase.js";
-
 export interface AuthenticatedRequest extends Request {
   userId?: string;
+  userRole?: string;
 }
+
+type SupabaseUser = {
+  id: string;
+  app_metadata?: Record<string, unknown>;
+};
 
 export async function requireAuth(
   req: AuthenticatedRequest,
@@ -20,38 +23,48 @@ export async function requireAuth(
     const authorization = req.headers.authorization;
 
     if (!authorization?.startsWith("Bearer ")) {
-      res.status(401).json({
-        error: "يجب تسجيل الدخول أولاً"
-      });
+      res.status(401).json({ error: "يجب تسجيل الدخول أولاً" });
       return;
     }
 
     const token = authorization.slice(7).trim();
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!token) {
-      res.status(401).json({
-        error: "رمز الدخول غير صالح"
+    if (!token || !supabaseUrl || !serviceRoleKey) {
+      res.status(token ? 503 : 401).json({
+        error: token ? "خدمة التحقق غير متاحة حالياً" : "رمز الدخول غير صالح"
       });
       return;
     }
 
-    const { data, error } =
-      await supabaseAdmin.auth.getUser(token);
+    const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/auth/v1/user`, {
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${token}`
+      },
+      signal: AbortSignal.timeout(10000)
+    });
 
-    if (error || !data.user) {
+    if (!response.ok) {
       res.status(401).json({
         error: "انتهت جلسة الدخول، سجل دخولك مرة أخرى"
       });
       return;
     }
 
-    req.userId = data.user.id;
+    const user = await response.json() as SupabaseUser;
+    if (!user?.id) {
+      res.status(401).json({ error: "الحساب غير صالح" });
+      return;
+    }
+
+    req.userId = user.id;
+    const role = user.app_metadata?.role;
+    req.userRole = typeof role === "string" ? role : "user";
     next();
   } catch (error) {
-    console.error("Authentication error:", error);
-
-    res.status(500).json({
-      error: "تعذر التحقق من الحساب"
-    });
+    console.error("Authentication error:", error instanceof Error ? error.message : "unknown");
+    res.status(503).json({ error: "تعذر التحقق من الحساب حالياً" });
   }
 }
