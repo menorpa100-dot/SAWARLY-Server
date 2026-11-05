@@ -10,9 +10,6 @@ export type AIProvider = {
   model: string;
 };
 
-// لا يتم تفعيل أي مزوّد للصور الخاصة
-// إلا بعد التحقق من سياسة الخصوصية وشروط الاستخدام.
-
 export const AI_PROVIDERS: AIProvider[] = [
   {
     name: "Groq",
@@ -20,7 +17,7 @@ export const AI_PROVIDERS: AIProvider[] = [
     supportsVision: true,
     freeOnly: true,
     privacyApproved: false,
-    apiKeyEnv: "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",
+    apiKeyEnv: "GROQ_API_KEY",
     baseURL: "https://api.groq.com/openai/v1",
     model: "MODEL_TO_VERIFY"
   },
@@ -30,7 +27,7 @@ export const AI_PROVIDERS: AIProvider[] = [
     supportsVision: true,
     freeOnly: true,
     privacyApproved: false,
-    apiKeyEnv: "AQ.Ab8RN6Jrlq5p5-2nHuiYHlXIImyKmH0gG8-nGnHI725XhAkHTw",
+    apiKeyEnv: "GEMINI_API_KEY",
     baseURL: "GEMINI_ENDPOINT_TO_CONFIGURE",
     model: "MODEL_TO_VERIFY"
   },
@@ -40,9 +37,9 @@ export const AI_PROVIDERS: AIProvider[] = [
     supportsVision: true,
     freeOnly: true,
     privacyApproved: false,
-    apiKeyEnv: "cohere_MDk7xPeOJ5GOq0o4Y25TCGWsx2uSwrGQfEJxnZPt0tzQxz",
+    apiKeyEnv: "COHERE_API_KEY",
     baseURL: "https://api.cohere.com/v2",
-    model: "command-a-vision-07-2025"
+    model: "MODEL_TO_VERIFY"
   },
   {
     name: "OpenRouter",
@@ -50,7 +47,7 @@ export const AI_PROVIDERS: AIProvider[] = [
     supportsVision: true,
     freeOnly: true,
     privacyApproved: false,
-    apiKeyEnv: "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",
+    apiKeyEnv: "OPENROUTER_API_KEY",
     baseURL: "https://openrouter.ai/api/v1",
     model: "MODEL_TO_VERIFY"
   },
@@ -60,7 +57,7 @@ export const AI_PROVIDERS: AIProvider[] = [
     supportsVision: true,
     freeOnly: true,
     privacyApproved: false,
-    apiKeyEnv: "fb6f1107a37f4367a1e291fc0742b8a6",
+    apiKeyEnv: "ZAI_API_KEY",
     baseURL: "https://api.z.ai/api/paas/v4",
     model: "glm-4.6v-flash"
   }
