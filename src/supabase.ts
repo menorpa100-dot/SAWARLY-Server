@@ -1,20 +1,4 @@
-
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !serviceRoleKey) {
-  throw new Error("Supabase environment variables are missing");
-}
-
-export const supabaseAdmin = createClient(
-  supabaseUrl,
-  serviceRoleKey,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  }
-);
+// Supabase access for this server is implemented with the authenticated Auth REST endpoint
+// and server-only PostgREST requests in src/auth.ts and src/support.ts.
+// Keep this module dependency-free so TypeScript does not require a client SDK in the server bundle.
+export {};

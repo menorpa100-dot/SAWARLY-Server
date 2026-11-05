@@ -6,6 +6,7 @@ import multer from "multer";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { AI_PROVIDERS, type AIProvider } from "./ai-providers.js";
+import supportRouter from "./support.js";
 
 const app = express();
 
@@ -27,6 +28,8 @@ app.use(
     legacyHeaders: false
   })
 );
+
+app.use("/api/support", supportRouter);
 
 const upload = multer({
   storage: multer.memoryStorage(),
