@@ -34,6 +34,10 @@ async function databaseRequest<T>(
   return (body ? JSON.parse(body) : null) as T;
 }
 
+function routeParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
+}
+
 function userId(req: AuthenticatedRequest): string {
   if (!req.userId) throw new Error("AUTH_REQUIRED");
   return req.userId;
@@ -98,8 +102,8 @@ router.get("/tickets/:ticketId/messages", async (req: AuthenticatedRequest, res:
   try {
     const owner = userId(req);
     const ticketFilter = isStaff(req)
-      ? `id=eq.${encodeURIComponent(req.params.ticketId)}`
-      : `id=eq.${encodeURIComponent(req.params.ticketId)}&user_id=eq.${encodeURIComponent(owner)}`;
+      ? `id=eq.${encodeURIComponent(routeParam(req.params.ticketId))}`
+      : `id=eq.${encodeURIComponent(routeParam(req.params.ticketId))}&user_id=eq.${encodeURIComponent(owner)}`;
 
     const tickets = await databaseRequest<Array<{ id: string }>>(
       `support_tickets?select=id&${ticketFilter}&limit=1`
@@ -110,7 +114,7 @@ router.get("/tickets/:ticketId/messages", async (req: AuthenticatedRequest, res:
     }
 
     const messages = await databaseRequest<unknown[]>(
-      `support_messages?select=id,sender_role,message,created_at&ticket_id=eq.${encodeURIComponent(req.params.ticketId)}&order=created_at.asc&limit=200`
+      `support_messages?select=id,sender_role,message,created_at&ticket_id=eq.${encodeURIComponent(routeParam(req.params.ticketId))}&order=created_at.asc&limit=200`
     );
     res.json({ success: true, messages });
   } catch (error) {
@@ -133,8 +137,8 @@ async function addMessage(req: AuthenticatedRequest, res: Response, staffReply: 
     }
 
     const ticketFilter = staffReply
-      ? `id=eq.${encodeURIComponent(req.params.ticketId)}`
-      : `id=eq.${encodeURIComponent(req.params.ticketId)}&user_id=eq.${encodeURIComponent(sender)}&status=eq.open`;
+      ? `id=eq.${encodeURIComponent(routeParam(req.params.ticketId))}`
+      : `id=eq.${encodeURIComponent(routeParam(req.params.ticketId))}&user_id=eq.${encodeURIComponent(sender)}&status=eq.open`;
 
     const tickets = await databaseRequest<Array<{ id: string }>>(
       `support_tickets?select=id&${ticketFilter}&limit=1`
@@ -150,7 +154,7 @@ async function addMessage(req: AuthenticatedRequest, res: Response, staffReply: 
         method: "POST",
         headers: { Prefer: "return=representation" },
         body: JSON.stringify({
-          ticket_id: req.params.ticketId,
+          ticket_id: routeParam(req.params.ticketId),
           sender_id: sender,
           sender_role: staffReply ? "staff" : "user",
           message
@@ -159,7 +163,7 @@ async function addMessage(req: AuthenticatedRequest, res: Response, staffReply: 
     );
 
     await databaseRequest(
-      `support_tickets?id=eq.${encodeURIComponent(req.params.ticketId)}`,
+      `support_tickets?id=eq.${encodeURIComponent(routeParam(req.params.ticketId))}`,
       {
         method: "PATCH",
         headers: { Prefer: "return=minimal" },
@@ -203,7 +207,7 @@ router.patch("/staff/tickets/:ticketId/resolve", async (req: AuthenticatedReques
       return;
     }
     const rows = await databaseRequest<Array<{ id: string }>>(
-      `support_tickets?id=eq.${encodeURIComponent(req.params.ticketId)}&select=id`,
+      `support_tickets?id=eq.${encodeURIComponent(routeParam(req.params.ticketId))}&select=id`,
       {
         method: "PATCH",
         headers: { Prefer: "return=representation" },
