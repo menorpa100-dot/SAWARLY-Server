@@ -5,7 +5,7 @@ import cors from "cors";
 import multer from "multer";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { AI_PROVIDERS, type AIProvider } from "./ai-providers";
+import { AI_PROVIDERS, type AIProvider } from "./ai-providers.js";
 
 const app = express();
 
@@ -276,6 +276,7 @@ async function callGemini(
   });
 
   const parts = data.candidates?.[0]?.content?.parts;
+
   const result = Array.isArray(parts)
     ? parts
         .map((part: any) =>
@@ -356,18 +357,33 @@ async function analyzeWithProvider(
 
   if (provider.kind === "gemini") {
     return callGemini(
-      provider, apiKey, model, imageBase64, mimeType, prompt
+      provider,
+      apiKey,
+      model,
+      imageBase64,
+      mimeType,
+      prompt
     );
   }
 
   if (provider.kind === "cohere") {
     return callCohere(
-      provider, apiKey, model, imageBase64, mimeType, prompt
+      provider,
+      apiKey,
+      model,
+      imageBase64,
+      mimeType,
+      prompt
     );
   }
 
   return callOpenAICompatible(
-    provider, apiKey, model, imageBase64, mimeType, prompt
+    provider,
+    apiKey,
+    model,
+    imageBase64,
+    mimeType,
+    prompt
   );
 }
 
@@ -389,12 +405,12 @@ async function analyzeImage(
   prompt: string,
   allowExternalFallback: boolean
 ): Promise<{ analysis: string; provider: string }> {
-  const primary = AI_PROVIDERS.find(
-    (item) => item.id === "zai"
+  const primary: AIProvider | undefined = AI_PROVIDERS.find(
+    (item: AIProvider) => item.id === "zai"
   );
 
-  const fallbacks = AI_PROVIDERS.filter(
-    (item) => item.id !== "zai"
+  const fallbacks: AIProvider[] = AI_PROVIDERS.filter(
+    (item: AIProvider) => item.id !== "zai"
   );
 
   const candidates: AIProvider[] = [];
@@ -435,7 +451,6 @@ async function analyzeImage(
     } catch (error) {
       const status = getErrorStatus(error);
 
-      // نسجل اسم المزود ورقم الخطأ فقط، دون مفاتيح أو بيانات الصورة.
       console.error(
         `AI provider failed: ${provider.name}, status: ${status ?? "network"}`
       );
@@ -459,7 +474,7 @@ app.get("/", (_req, res) => {
 app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
-    providers: AI_PROVIDERS.map((provider) => ({
+    providers: AI_PROVIDERS.map((provider: AIProvider) => ({
       name: provider.name,
       configured: Boolean(getProviderKey(provider)),
       enabled: provider.enabled,
@@ -487,7 +502,6 @@ app.post(
           ? req.body.question.trim().slice(0, 2000)
           : "";
 
-      // لا نسمح بالمزودين الإضافيين إلا بموافقة صريحة من التطبيق.
       const allowExternalFallback =
         req.body.allowExternalFallback === "true" ||
         req.body.allowExternalFallback === true;
