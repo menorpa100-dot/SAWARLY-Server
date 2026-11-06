@@ -135,8 +135,10 @@ async function extractReceipt(file: Express.Multer.File): Promise<{
 }> {
   const apiKey = process.env.ZAI_API_KEY?.trim();
   const model = process.env.ZAI_MODEL?.trim() || "glm-4.6v-flash";
-  if (!apiKey) {
-    return { extracted: null, result: { status: "unavailable", reason: "ocr_not_configured" } };
+  const providerEnabled = process.env.ZAI_ENABLED === "true";
+  const freeConfirmed = process.env.ZAI_FREE_CONFIRMED === "true";
+  if (!apiKey || !providerEnabled || !freeConfirmed) {
+    return { extracted: null, result: { status: "unavailable", reason: "ocr_provider_not_enabled" } };
   }
 
   const prompt = `اقرأ إيصال تحويل Vodafone Cash المرفق لاستخراج البيانات الظاهرة فقط.
