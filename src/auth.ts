@@ -29,9 +29,12 @@ export async function requireAuth(
 
     const token = authorization.slice(7).trim();
     const supabaseUrl = process.env.SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const authApiKey =
+      process.env.SUPABASE_ANON_KEY ||
+      process.env.SUPABASE_PUBLISHABLE_KEY ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!token || !supabaseUrl || !serviceRoleKey) {
+    if (!token || !supabaseUrl || !authApiKey) {
       res.status(token ? 503 : 401).json({
         error: token ? "خدمة التحقق غير متاحة حالياً" : "رمز الدخول غير صالح"
       });
@@ -40,7 +43,7 @@ export async function requireAuth(
 
     const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/auth/v1/user`, {
       headers: {
-        apikey: serviceRoleKey,
+        apikey: authApiKey,
         Authorization: `Bearer ${token}`
       },
       signal: AbortSignal.timeout(10000)
