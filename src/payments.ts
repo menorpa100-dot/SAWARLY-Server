@@ -219,7 +219,7 @@ async function uploadProof(path: string, file: Express.Multer.File): Promise<voi
       "Content-Type": file.mimetype,
       "x-upsert": "false"
     },
-    body: file.buffer,
+    body: new Uint8Array(file.buffer),
     signal: AbortSignal.timeout(20000)
   });
 
