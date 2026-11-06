@@ -251,6 +251,23 @@ async function addAuditEvent(
   });
 }
 
+async function expireOldOrders(userId: string): Promise<void> {
+  const now = new Date().toISOString();
+  const expired = await databaseRequest<DbRow[]>(
+    `payment_orders?select=id&user_id=eq.${encodeURIComponent(userId)}&status=eq.pending&review_window_started_at=is.null&expires_at=lt.${encodeURIComponent(now)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ status: "expired", cancelled_at: now })
+    }
+  );
+  for (const order of expired) {
+    await addAuditEvent(order.id, null, null, "order_expired", {
+      reason: "no_receipt_uploaded_within_five_minutes"
+    });
+  }
+}
+
 router.post("/orders", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = currentUserId(req);
@@ -281,7 +298,8 @@ router.post("/orders", async (req: AuthenticatedRequest, res: Response) => {
           amount_piasters: amountPiasters,
           currency: "EGP",
           provider: "vodafone_cash_manual",
-          status: "pending"
+          status: "pending",
+          expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString()
         })
       }
     );
@@ -310,8 +328,9 @@ router.post("/orders", async (req: AuthenticatedRequest, res: Response) => {
 router.get("/orders", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = currentUserId(req);
+    await expireOldOrders(userId);
     const orders = await databaseRequest<DbRow[]>(
-      `payment_orders?select=id,plan,amount_piasters,currency,provider,status,created_at,paid_at,review_window_ends_at&user_id=eq.${encodeURIComponent(userId)}&order=created_at.desc&limit=50`
+      `payment_orders?select=id,plan,amount_piasters,currency,provider,status,created_at,paid_at,expires_at,review_window_ends_at&user_id=eq.${encodeURIComponent(userId)}&order=created_at.desc&limit=50`
     );
     res.json({ success: true, orders });
   } catch (error) {
@@ -350,7 +369,7 @@ router.post("/receipts", upload.single("image"), async (req: AuthenticatedReques
     }
 
     const orders = await databaseRequest<DbRow[]>(
-      `payment_orders?select=id,user_id,plan,amount_piasters,status&id=eq.${encodeURIComponent(orderId)}&user_id=eq.${encodeURIComponent(userId)}&limit=1`
+      `payment_orders?select=id,user_id,plan,amount_piasters,status,expires_at&id=eq.${encodeURIComponent(orderId)}&user_id=eq.${encodeURIComponent(userId)}&limit=1`
     );
     const order = orders[0];
     if (!order) {
@@ -359,6 +378,22 @@ router.post("/receipts", upload.single("image"), async (req: AuthenticatedReques
     }
     if (order.status !== "pending") {
       res.status(409).json({ error: "طلب الدفع لم يعد قيد الانتظار" });
+      return;
+    }
+    if (order.expires_at && Date.parse(String(order.expires_at)) <= Date.now()) {
+      const expiredAt = new Date().toISOString();
+      await databaseRequest(
+        `payment_orders?id=eq.${encodeURIComponent(orderId)}&user_id=eq.${encodeURIComponent(userId)}&status=eq.pending`,
+        {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ status: "expired", cancelled_at: expiredAt })
+        }
+      );
+      await addAuditEvent(orderId, null, null, "order_expired", {
+        reason: "receipt_submitted_after_five_minute_deadline"
+      });
+      res.status(410).json({ error: "انتهت مهلة طلب الدفع البالغة 5 دقائق. أنشئ طلباً جديداً." });
       return;
     }
 
