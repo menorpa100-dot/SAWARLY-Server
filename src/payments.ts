@@ -263,6 +263,12 @@ router.post("/orders", async (req: AuthenticatedRequest, res: Response) => {
       return;
     }
 
+    const receiverPhone = process.env.VODAFONE_CASH_RECEIVER_PHONE?.trim();
+    if (!receiverPhone) {
+      res.status(503).json({ error: "بيانات الاستلام لم يتم إعدادها بعد. لن يتم إنشاء طلب دفع الآن." });
+      return;
+    }
+
     const amountPiasters = plan === "monthly" ? 2900 : 4900;
     const rows = await databaseRequest<Array<DbRow>>(
       "payment_orders?select=id,plan,amount_piasters,currency,provider,status,created_at",
@@ -287,7 +293,15 @@ router.post("/orders", async (req: AuthenticatedRequest, res: Response) => {
       amount_piasters: amountPiasters
     });
 
-    res.status(201).json({ success: true, order });
+    res.status(201).json({
+      success: true,
+      order,
+      payment_instructions: {
+        receiver_phone: receiverPhone,
+        amount_egp: amountPiasters / 100,
+        currency: "EGP"
+      }
+    });
   } catch (error) {
     sendError(res, error);
   }
