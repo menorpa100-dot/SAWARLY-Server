@@ -200,7 +200,7 @@ router.post("/staff/tickets/:ticketId/messages", (req: AuthenticatedRequest, res
   addMessage(req, res, true)
 );
 
-router.patch("/staff/tickets/:ticketId/resolve", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/staff/tickets/:ticketId/resolve", async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (!isStaff(req)) {
       res.status(403).json({ error: "غير مسموح" });
